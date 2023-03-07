@@ -1,0 +1,24 @@
+samples('https://shabda.ndre.gr/slap:8.json?strudel=1')
+samples('https://shabda.ndre.gr/crunch:8.json?strudel=1')
+
+var a = s("slap:3 crunch:4 [~ slap:3] crunch:3 slap:4 [~ crunch:5]")
+  .iter(3)
+  .clip(1).legato(saw.slow(2)).begin(0.2)
+  .slow("2").hcutoff(2000).hresonance(0.2)
+
+var b = n("5 [~ 7] 5*2 5 [~ 7] 5*2").iter(3).s("slap")
+  .speed(1).room(2).size("1")
+  .hcutoff(1000)
+
+var c = s("mt*3")
+  .bank("ViscoSpaceDrum")
+  .speed(perlin.range(0.25,0.5).slow(5))
+  .echoWith(4,1/4,(x,i) => x.add(speed(i/2
+                                      )).gain(0.75*((4-i)/4)))
+
+var d = s("~ cb ~ ~").bank("ViscoSpaceDrum").speed("[1,2,2.5]").room(1).size(2).slow(2)
+   .echo(4,-0.25,0.5)
+
+stack(a,b,c,d)
+  .slow(1.4)
+

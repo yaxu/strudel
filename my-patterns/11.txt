@@ -1,0 +1,10 @@
+var a = s("<[bd [~ sd] bd*2] [bd [~ sd] bd*2 sd]>")
+  .slow(2)
+  .echoWith("<5>","<1 3 5 6 7>".div("<8 6>"), (x,i) => x.add(n("1 3").speed(1+i*0.75).pan(i/6)))
+  .bank("LinnDrum")
+
+var b = s("<cb*2 cb*3>".slow(2)).speed(1.5).gain(2).bank("ViscoSpaceDrum")
+
+stack(a,b)
+  .slow(1.2)
+

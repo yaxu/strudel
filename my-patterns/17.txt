@@ -1,0 +1,18 @@
+var a = s("[bd*6, sd(5,12,3)]")
+
+var b = s("lt mt ht hh".slow(2))
+  .echoWith(4, (1/8), (x,i) => x.squeeze(n("1 2 3").gain(3/i).legato(0.125).clip(1)))
+  .gain(1.1).hcutoff(saw.range(500,2000).slow(3)).room(0.4).size(2)
+
+
+var c = n("[[c4,g3](3,8,<0 2>) ~ ~, <[~ ~ g4 ~]*4 ~ [~ ~ f3 ~]*4 ~>]").s("sawtooth")
+  .echoWith("<3 5>",rand.range(0.004,0.002), (x,i) => x.add(n(pure(i).div("<10 20 15>"))))
+  .echo(3,1/6,0.8)
+  .add(n("<0 2 0>"))
+  .off("<0.125 0.3333>", x => x.add("19,12 <[17 15]*4 [19 22]*8>"))
+  .room(0.5).size(1.2).pan(sine.range(0.4,0.6).slow(2))
+
+stack(a,b).bank("RolandTR909").stack(c)
+  .slow(2.4)
+
+
