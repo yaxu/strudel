@@ -1,6 +1,6 @@
 packages:
   # all packages in direct subdirs of packages/
   - "packages/*"
+  - "examples/*"
+  - "tools/dbpatch"
   - "website/"
-  - "packages/core/examples/vite-vanilla-repl"
-  - "packages/react/examples/nano-repl"

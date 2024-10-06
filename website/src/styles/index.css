@@ -10,9 +10,41 @@
   font-family: 'x3270';
   src: url('/fonts/3270/3270-Regular.ttf');
 }
-
-.cm-gutters {
-  display: none !important;
+@font-face {
+  font-family: 'galactico';
+  src: url('/fonts/galactico/Galactico-Basic.otf');
+}
+@font-face {
+  font-family: 'JetBrains';
+  src: url('/fonts/JetBrains/JetBrainsMono.woff2');
+}
+@font-face {
+  font-family: 'Monocraft';
+  src: url('/fonts/Monocraft/Monocraft.ttf');
+}
+@font-face {
+  font-family: 'Hack';
+  src: url('/fonts/Hack/Hack-Regular.ttf');
+}
+@font-face {
+  font-family: 'we-come-in-peace';
+  src: url('/fonts/we-come-in-peace/we-come-in-peace-bb.regular.ttf');
+}
+@font-face {
+  font-family: 'FiraCode';
+  src: url('/fonts/FiraCode/FiraCode-Regular.ttf');
+}
+@font-face {
+  font-family: 'FiraCode-SemiBold';
+  src: url('/fonts/FiraCode/FiraCode-SemiBold.ttf');
+}
+@font-face {
+  font-family: 'teletext';
+  src: url('/fonts/teletext/EuropeanTeletext.ttf');
+}
+@font-face {
+  font-family: 'mode7';
+  src: url('/fonts/mode7/MODE7GX3.TTF');
 }
 
 .prose > h1:not(:first-child) {
@@ -22,7 +54,6 @@
   --app-height: 100vh;
 }
 
-#console-tab,
-#samples-tab {
+#console-tab {
   font-family: BigBlueTerminal, monospace;
 }

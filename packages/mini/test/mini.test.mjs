@@ -4,8 +4,9 @@ Copyright (C) 2022 Strudel contributors - see <https://github.com/tidalcycles/st
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details. You should have received a copy of the GNU Affero General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { mini } from '../mini.mjs';
-import '@strudel.cycles/core/euclid.mjs';
+import { getLeafLocation, getLeafLocations, mini, mini2ast } from '../mini.mjs';
+import '@strudel/core/euclid.mjs';
+import { Fraction } from '@strudel/core/index.mjs';
 import { describe, expect, it } from 'vitest';
 
 describe('mini', () => {
@@ -73,6 +74,10 @@ describe('mini', () => {
     expect(minS('a!3 b')).toEqual(['a: 0 - 1/4', 'a: 1/4 - 1/2', 'a: 1/2 - 3/4', 'b: 3/4 - 1']);
     expect(minS('[<a b c>]!3 d')).toEqual(minS('<a b c> <a b c> <a b c> d'));
   });
+  it('supports replication via repeated !', () => {
+    expect(minS('a ! ! b')).toEqual(['a: 0 - 1/4', 'a: 1/4 - 1/2', 'a: 1/2 - 3/4', 'b: 3/4 - 1']);
+    expect(minS('[<a b c>]!! d')).toEqual(minS('<a b c> <a b c> <a b c> d'));
+  });
   it('supports euclidean rhythms', () => {
     expect(minS('a(3, 8)')).toEqual(['a: 0 - 1/8', 'a: 3/8 - 1/2', 'a: 3/4 - 7/8']);
   });
@@ -113,6 +118,9 @@ describe('mini', () => {
     checkEuclid([11, 24], 'x ~ ~ x ~ x ~ x ~ x ~ x ~ ~ x ~ x ~ x ~ x ~ x ~');
     checkEuclid([13, 24], 'x ~ x x ~ x ~ x ~ x ~ x ~ x x ~ x ~ x ~ x ~ x ~');
   });
+  it('supports the - alias for ~', () => {
+    expect(minS('a - b [- c]')).toEqual(minS('a ~ b [~ c]'));
+  });
   it('supports the ? operator', () => {
     expect(
       mini('a?')
@@ -140,10 +148,22 @@ describe('mini', () => {
     expect(haps.length < 230).toBe(true);
     // 'Had too many cycles remaining after degradeBy 0.8');
   });
-  it('supports lists', () => {
-    expect(minV('a:b c:d:[e:f] g')).toEqual([['a', 'b'], ['c', 'd', ['e', 'f']], 'g']);
+  it('supports multiple independent uses of the random choice operator ("|")', () => {
+    const numCycles = 1000;
+    const values = mini('[a|b] [a|b]')
+      .queryArc(0, numCycles)
+      .map((e) => e.value);
+    const observed = { aa: 0, ab: 0, ba: 0, bb: 0 };
+    for (let i = 0; i < values.length; i += 2) {
+      const chunk = values.slice(i, i + 2);
+      observed[chunk.join('')]++;
+    }
+    for (const count of Object.values(observed)) {
+      // Should fall within 99% confidence interval for binomial with p=0.25.
+      expect(215 <= count && count <= 286).toBe(true);
+    }
   });
-  /*it('supports the random choice operator ("|") with nesting', () => {
+  it('supports the random choice operator ("|") with nesting', () => {
     const numCycles = 900;
     const haps = mini('a | [b | c] | [d | e | f]').queryArc(0, numCycles);
     // Should have about 1/3 a, 1/6 each of b | c, and 1/9 each of d | e | f.
@@ -168,6 +188,68 @@ describe('mini', () => {
     // 15.086 is the chisq for 5 degrees of freedom at 99%, so for 99% of uniformly-distributed
     //  PRNG, this test should succeed
     expect(chisq <= 15.086).toBe(true);
-    // assert(chisq <= 15.086, chisq + ' was expected to be less than 15.086 under chi-squared test');
-  });*/
+  });
+  it('supports lists', () => {
+    expect(minV('a:b c:d:[e:f] g')).toEqual([['a', 'b'], ['c', 'd', ['e', 'f']], 'g']);
+  });
+  it('supports ranges', () => {
+    expect(minV('0 .. 4')).toEqual([0, 1, 2, 3, 4]);
+  });
+  it('supports patterned ranges', () => {
+    expect(minS('[<0 1> .. <2 4>]*2')).toEqual(minS('[0 1 2] [1 2 3 4]'));
+  });
+  it('supports the . operator', () => {
+    expect(minS('a . b c')).toEqual(minS('a [b c]'));
+    expect(minS('a . b c . [d e f . g h]')).toEqual(minS('a [b c] [[d e f] [g h]]'));
+  });
+  it('supports the _ operator', () => {
+    expect(minS('a _ b _ _')).toEqual(minS('a@2 b@3'));
+  });
+  it('_ and @ are almost interchangeable', () => {
+    expect(minS('a @ b @ @')).toEqual(minS('a _2 b _3'));
+  });
+  it('supports ^ tactus marking', () => {
+    expect(mini('a [^b c]').tactus).toEqual(Fraction(4));
+    expect(mini('[^b c]!3').tactus).toEqual(Fraction(6));
+    expect(mini('[a b c] [d [e f]]').tactus).toEqual(Fraction(2));
+    expect(mini('^[a b c] [d [e f]]').tactus).toEqual(Fraction(2));
+    expect(mini('[a b c] [d [^e f]]').tactus).toEqual(Fraction(8));
+    expect(mini('[a b c] [^d [e f]]').tactus).toEqual(Fraction(4));
+    expect(mini('[^a b c] [^d [e f]]').tactus).toEqual(Fraction(12));
+    expect(mini('[^a b c] [d [^e f]]').tactus).toEqual(Fraction(24));
+    expect(mini('[^a b c d e]').tactus).toEqual(Fraction(5));
+  });
+});
+
+describe('getLeafLocation', () => {
+  it('gets location of leaf nodes', () => {
+    const code = '"bd sd"';
+    const ast = mini2ast(code);
+
+    const bd = ast.source_[0].source_;
+    expect(getLeafLocation(code, bd)).toEqual([1, 3]);
+
+    const sd = ast.source_[1].source_;
+    expect(getLeafLocation(code, sd)).toEqual([4, 6]);
+  });
+});
+
+describe('getLeafLocations', () => {
+  it('gets locations of leaf nodes', () => {
+    expect(getLeafLocations('"bd sd"')).toEqual([
+      [1, 3], // bd columns
+      [4, 6], // sd columns
+    ]);
+    expect(getLeafLocations('"bd*2 [sd cp]"')).toEqual([
+      [1, 3], // bd columns
+      [7, 9], // sd columns
+      [10, 12], // cp columns
+      [4, 5], // "2" columns
+    ]);
+    expect(getLeafLocations('"bd*<2 3>"')).toEqual([
+      [1, 3], // bd columns
+      [5, 6], // "2" columns
+      [7, 8], // "3" columns
+    ]);
+  });
 });

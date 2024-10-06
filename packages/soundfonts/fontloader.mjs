@@ -1,4 +1,13 @@
-import { toMidi } from '@strudel.cycles/core';
+import { noteToMidi, freqToMidi, getSoundIndex } from '@strudel/core';
+import {
+  getAudioContext,
+  registerSound,
+  getParamADSR,
+  getADSRValues,
+  getPitchEnvelope,
+  getVibratoOscillator,
+} from '@strudel/webaudio';
+import gm from './gm.mjs';
 
 let loadCache = {};
 async function loadFont(name) {
@@ -8,7 +17,6 @@ async function loadFont(name) {
   const load = async () => {
     // TODO: make soundfont source configurable
     const url = `https://felixroos.github.io/webaudiofontdata/sound/${name}.js`;
-    console.log('load font', name, url);
     const preset = await fetch(url).then((res) => res.text());
     let [_, data] = preset.split('={');
     return eval('{' + data);
@@ -17,15 +25,24 @@ async function loadFont(name) {
   return loadCache[name];
 }
 
-export async function getFontBufferSource(name, pitch, ac) {
-  if (typeof pitch === 'string') {
-    pitch = toMidi(pitch);
+export async function getFontBufferSource(name, value, ac) {
+  let { note = 'c3', freq } = value;
+  let midi;
+  if (freq) {
+    midi = freqToMidi(freq);
+  } else if (typeof note === 'string') {
+    midi = noteToMidi(note);
+  } else if (typeof note === 'number') {
+    midi = note;
+  } else {
+    throw new Error(`unexpected "note" type "${typeof note}"`);
   }
-  const { buffer, zone } = await getFontPitch(name, pitch, ac);
+
+  const { buffer, zone } = await getFontPitch(name, midi, ac);
   const src = ac.createBufferSource();
   src.buffer = buffer;
   const baseDetune = zone.originalPitch - 100.0 * zone.coarseTune - zone.fineTune;
-  const playbackRate = 1.0 * Math.pow(2, (100.0 * pitch - baseDetune) / 1200.0);
+  const playbackRate = 1.0 * Math.pow(2, (100.0 * midi - baseDetune) / 1200.0);
   // src detune?
   src.playbackRate.value = playbackRate;
   const loop = zone.loopStart > 1 && zone.loopStart < zone.loopEnd;
@@ -113,4 +130,48 @@ async function getBuffer(zone, audioContext) {
       return new Promise((resolve) => audioContext.decodeAudioData(arraybuffer, resolve));
     }
   }
+}
+
+export function registerSoundfonts() {
+  Object.entries(gm).forEach(([name, fonts]) => {
+    registerSound(
+      name,
+      async (time, value, onended) => {
+        const [attack, decay, sustain, release] = getADSRValues([
+          value.attack,
+          value.decay,
+          value.sustain,
+          value.release,
+        ]);
+
+        const { duration } = value;
+        const n = getSoundIndex(value.n, fonts.length);
+        const font = fonts[n];
+        const ctx = getAudioContext();
+        const bufferSource = await getFontBufferSource(font, value, ctx);
+        bufferSource.start(time);
+        const envGain = ctx.createGain();
+        const node = bufferSource.connect(envGain);
+        const holdEnd = time + duration;
+        getParamADSR(node.gain, attack, decay, sustain, release, 0, 0.3, time, holdEnd, 'linear');
+        let envEnd = holdEnd + release + 0.01;
+
+        // vibrato
+        let vibratoOscillator = getVibratoOscillator(bufferSource.detune, value, time);
+        // pitch envelope
+        getPitchEnvelope(bufferSource.detune, value, time, holdEnd);
+
+        bufferSource.stop(envEnd);
+        const stop = (releaseTime) => {};
+        bufferSource.onended = () => {
+          bufferSource.disconnect();
+          vibratoOscillator?.stop();
+          node.disconnect();
+          onended();
+        };
+        return { node, stop };
+      },
+      { type: 'soundfont', prebake: true, fonts },
+    );
+  });
 }
